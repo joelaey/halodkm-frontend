@@ -28,6 +28,10 @@ export default function KeluargaPage() {
         rt: 'RT 01',
         alamat: '',
         no_hp: '',
+        // Fields untuk kepala keluarga (auto-add ke family_members)
+        nik_kepala: '',
+        jenis_kelamin_kepala: 'Laki-laki',
+        tanggal_lahir_kepala: '',
     });
 
     // Form state for family member
@@ -164,6 +168,9 @@ export default function KeluargaPage() {
             rt: 'RT 01',
             alamat: '',
             no_hp: '',
+            nik_kepala: '',
+            jenis_kelamin_kepala: 'Laki-laki',
+            tanggal_lahir_kepala: '',
         });
         setEditingFamily(null);
     };
@@ -187,6 +194,10 @@ export default function KeluargaPage() {
             rt: family.rt,
             alamat: family.alamat || '',
             no_hp: family.no_hp || '',
+            // Saat edit, field ini tidak perlu diisi ulang
+            nik_kepala: '',
+            jenis_kelamin_kepala: 'Laki-laki',
+            tanggal_lahir_kepala: '',
         });
         setShowForm(true);
     };
@@ -395,6 +406,52 @@ export default function KeluargaPage() {
                                     placeholder="Alamat lengkap"
                                 />
                             </div>
+
+                            {/* Fields khusus untuk tambah keluarga baru (bukan edit) */}
+                            {!editingFamily && (
+                                <>
+                                    <div className="border-t border-gray-200 pt-4 mt-4">
+                                        <h4 className="font-semibold text-gray-800 mb-3">Data Kepala Keluarga (Otomatis menjadi anggota)</h4>
+                                        <div className="grid md:grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-bold text-gray-700 mb-2">NIK Kepala Keluarga</label>
+                                                <input
+                                                    type="text"
+                                                    className="input"
+                                                    value={formData.nik_kepala}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value.replace(/\D/g, '').slice(0, 16);
+                                                        setFormData({ ...formData, nik_kepala: value });
+                                                    }}
+                                                    placeholder="16 digit NIK"
+                                                    maxLength={16}
+                                                    required
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-bold text-gray-700 mb-2">Jenis Kelamin</label>
+                                                <select
+                                                    className="input"
+                                                    value={formData.jenis_kelamin_kepala}
+                                                    onChange={(e) => setFormData({ ...formData, jenis_kelamin_kepala: e.target.value })}
+                                                >
+                                                    <option value="Laki-laki">Laki-laki</option>
+                                                    <option value="Perempuan">Perempuan</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-bold text-gray-700 mb-2">Tanggal Lahir</label>
+                                                <input
+                                                    type="date"
+                                                    className="input"
+                                                    value={formData.tanggal_lahir_kepala}
+                                                    onChange={(e) => setFormData({ ...formData, tanggal_lahir_kepala: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
 
                             <div className="flex gap-3">
                                 <Button type="submit" className="flex-1">

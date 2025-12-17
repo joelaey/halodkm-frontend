@@ -143,6 +143,9 @@ class ApiService {
         rt: string;
         alamat?: string;
         no_hp?: string;
+        nik_kepala: string;
+        jenis_kelamin_kepala: string;
+        tanggal_lahir_kepala?: string;
     }): Promise<ApiResponse<{ id: number }>> {
         const { data } = await this.api.post('/families', family);
         return data;
