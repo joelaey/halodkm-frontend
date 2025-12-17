@@ -51,6 +51,16 @@ class ApiService {
         await this.api.post('/auth/logout');
     }
 
+    async register(data: {
+        username: string;
+        password: string;
+        full_name: string;
+        no_hp?: string;
+    }): Promise<ApiResponse<null>> {
+        const { data: response } = await this.api.post('/auth/register', data);
+        return response;
+    }
+
     // Dashboard
     async getDashboardStats(rw?: string): Promise<ApiResponse<{
         stats: DashboardStats;
