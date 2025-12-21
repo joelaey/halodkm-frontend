@@ -252,6 +252,165 @@ class ApiService {
         const { data } = await this.api.get('/audit');
         return data;
     }
+
+    // Penduduk Khusus Management
+    async getPendudukKhusus(label?: string): Promise<ApiResponse<{
+        data: import('@/types').PendudukKhusus[];
+        total: number;
+        labelCounts: {
+            kontrak: number;
+            pedagang: number;
+            warga_dusun_lain: number;
+        };
+    }>> {
+        const { data } = await this.api.get('/penduduk-khusus', { params: { label } });
+        return data;
+    }
+
+    async createPendudukKhusus(penduduk: {
+        nik: string;
+        nama: string;
+        jenis_kelamin: string;
+        alamat?: string;
+        no_hp?: string;
+        label: 'kontrak' | 'pedagang' | 'warga_dusun_lain';
+        keterangan?: string;
+    }): Promise<ApiResponse<{ id: number }>> {
+        const { data } = await this.api.post('/penduduk-khusus', penduduk);
+        return data;
+    }
+
+    async updatePendudukKhusus(id: number, penduduk: {
+        nik: string;
+        nama: string;
+        jenis_kelamin: string;
+        alamat?: string;
+        no_hp?: string;
+        label: 'kontrak' | 'pedagang' | 'warga_dusun_lain';
+        keterangan?: string;
+    }): Promise<ApiResponse<null>> {
+        const { data } = await this.api.put(`/penduduk-khusus/${id}`, penduduk);
+        return data;
+    }
+
+    async deletePendudukKhusus(id: number): Promise<ApiResponse<null>> {
+        const { data } = await this.api.delete(`/penduduk-khusus/${id}`);
+        return data;
+    }
+
+    // Event Management
+    async getEvents(status?: 'aktif' | 'selesai'): Promise<ApiResponse<import('@/types').Event[]>> {
+        const { data } = await this.api.get('/events', { params: { status } });
+        return data;
+    }
+
+    async getEvent(id: number): Promise<ApiResponse<{
+        event: import('@/types').Event;
+        transactions: import('@/types').EventTransaction[];
+        summary: {
+            total_masuk: number;
+            total_keluar: number;
+            saldo: number;
+        };
+    }>> {
+        const { data } = await this.api.get(`/events/${id}`);
+        return data;
+    }
+
+    async createEvent(event: {
+        nama: string;
+        deskripsi?: string;
+        tipe: 'penggalangan_dana' | 'distribusi';
+        tanggal_mulai: string;
+    }): Promise<ApiResponse<{ id: number }>> {
+        const { data } = await this.api.post('/events', event);
+        return data;
+    }
+
+    async updateEvent(id: number, event: {
+        nama: string;
+        deskripsi?: string;
+        tipe: 'penggalangan_dana' | 'distribusi';
+        tanggal_mulai: string;
+    }): Promise<ApiResponse<null>> {
+        const { data } = await this.api.put(`/events/${id}`, event);
+        return data;
+    }
+
+    async deleteEvent(id: number): Promise<ApiResponse<null>> {
+        const { data } = await this.api.delete(`/events/${id}`);
+        return data;
+    }
+
+    async completeEvent(id: number): Promise<ApiResponse<{ transferred_amount: number }>> {
+        const { data } = await this.api.post(`/events/${id}/complete`);
+        return data;
+    }
+
+    async createEventTransaction(eventId: number, transaction: {
+        type: 'masuk' | 'keluar';
+        amount: number;
+        description: string;
+        tanggal: string;
+    }): Promise<ApiResponse<{ id: number }>> {
+        const { data } = await this.api.post(`/events/${eventId}/transactions`, transaction);
+        return data;
+    }
+
+    async updateEventTransaction(eventId: number, transId: number, transaction: {
+        type: 'masuk' | 'keluar';
+        amount: number;
+        description: string;
+        tanggal: string;
+    }): Promise<ApiResponse<null>> {
+        const { data } = await this.api.put(`/events/${eventId}/transactions/${transId}`, transaction);
+        return data;
+    }
+
+    async deleteEventTransaction(eventId: number, transId: number): Promise<ApiResponse<null>> {
+        const { data } = await this.api.delete(`/events/${eventId}/transactions/${transId}`);
+        return data;
+    }
+
+    // Event Recipients Management
+    async getEventRecipients(eventId: number): Promise<ApiResponse<{
+        data: import('@/types').EventRecipient[];
+        total: number;
+    }>> {
+        const { data } = await this.api.get(`/events/${eventId}/recipients`);
+        return data;
+    }
+
+    async createEventRecipient(eventId: number, recipient: {
+        nama: string;
+        alamat?: string;
+        no_hp?: string;
+        jenis_bantuan?: string;
+        jumlah?: string;
+        keterangan?: string;
+    }): Promise<ApiResponse<{ id: number }>> {
+        const { data } = await this.api.post(`/events/${eventId}/recipients`, recipient);
+        return data;
+    }
+
+    async updateEventRecipient(eventId: number, recipientId: number, recipient: {
+        nama: string;
+        alamat?: string;
+        no_hp?: string;
+        jenis_bantuan?: string;
+        jumlah?: string;
+        keterangan?: string;
+    }): Promise<ApiResponse<null>> {
+        const { data } = await this.api.put(`/events/${eventId}/recipients/${recipientId}`, recipient);
+        return data;
+    }
+
+    async deleteEventRecipient(eventId: number, recipientId: number): Promise<ApiResponse<null>> {
+        const { data } = await this.api.delete(`/events/${eventId}/recipients/${recipientId}`);
+        return data;
+    }
 }
 
 export const apiService = new ApiService();
+
+

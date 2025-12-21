@@ -1,15 +1,16 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, Trash2, TrendingUp, TrendingDown, X, Download, Edit2 } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, TrendingDown, X, Download, Edit2, Calendar } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { apiService } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import type { KasTransaction } from '@/types';
+import type { KasTransaction, Event } from '@/types';
 
 type PeriodType = 'bulan' | 'tahun' | 'semua';
+type ExportType = 'bulan' | 'tahun' | 'semua' | 'event';
 
 export default function KasMasjidPage() {
     const { user } = useAuth();
@@ -18,7 +19,7 @@ export default function KasMasjidPage() {
     const [loading, setLoading] = useState(true);
     const [period, setPeriod] = useState<PeriodType>('semua');
     const [showExportModal, setShowExportModal] = useState(false);
-    const [exportType, setExportType] = useState<'semua' | 'bulan' | 'tahun'>('semua');
+    const [exportType, setExportType] = useState<ExportType>('semua');
     const [exportMonth, setExportMonth] = useState(new Date().getMonth());
     const [exportYear, setExportYear] = useState(new Date().getFullYear());
     const [editingTransaction, setEditingTransaction] = useState<KasTransaction | null>(null);
@@ -30,11 +31,28 @@ export default function KasMasjidPage() {
         tanggal: new Date().toISOString().split('T')[0],
     });
 
+    // Events for export by event feature
+    const [events, setEvents] = useState<Event[]>([]);
+    const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+    const [isExportingEvent, setIsExportingEvent] = useState(false);
+
     const isAdmin = user?.role === 'admin';
 
     useEffect(() => {
         fetchTransactions();
+        fetchEvents();
     }, []);
+
+    const fetchEvents = async () => {
+        try {
+            const response = await apiService.getEvents();
+            if (response.success && response.data) {
+                setEvents(response.data);
+            }
+        } catch (error) {
+            console.error('Failed to load events:', error);
+        }
+    };
 
     const fetchTransactions = async () => {
         setLoading(true);
@@ -167,6 +185,66 @@ export default function KasMasjidPage() {
         setShowExportModal(false);
     };
 
+    // Export event transactions
+    const exportEventToCSV = async () => {
+        if (!selectedEventId) {
+            alert('Pilih event terlebih dahulu');
+            return;
+        }
+
+        setIsExportingEvent(true);
+        try {
+            const response = await apiService.getEvent(selectedEventId);
+            if (!response.success || !response.data) {
+                alert('Gagal mengambil data event');
+                return;
+            }
+
+            const { event, transactions: eventTrans, summary: eventSummary } = response.data;
+
+            if (eventTrans.length === 0) {
+                alert('Event tidak memiliki transaksi');
+                return;
+            }
+
+            const headers = ['Tanggal', 'Tipe', 'Deskripsi', 'Jumlah'];
+            const rows = eventTrans.map(t => [
+                new Date(t.tanggal).toLocaleDateString('id-ID'),
+                t.type === 'masuk' ? 'Pemasukan' : 'Pengeluaran',
+                t.description,
+                t.amount
+            ]);
+
+            rows.push([]);
+            rows.push(['', '', 'Total Pemasukan', eventSummary.total_masuk]);
+            rows.push(['', '', 'Total Pengeluaran', eventSummary.total_keluar]);
+            rows.push(['', '', 'Saldo', eventSummary.saldo]);
+
+            const csvContent = [
+                `Event: ${event.nama}`,
+                `Status: ${event.status === 'aktif' ? 'Aktif' : 'Selesai'}`,
+                '',
+                headers.join(','),
+                ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+            ].join('\n');
+
+            const safeName = event.nama.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
+            const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `keuangan_event_${safeName}_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+            URL.revokeObjectURL(url);
+            setShowExportModal(false);
+        } catch (error) {
+            console.error('Error exporting event:', error);
+            alert('Gagal mengekspor data event.');
+        } finally {
+            setIsExportingEvent(false);
+        }
+    };
+
     const resetForm = () => {
         setFormData({
             type: 'masuk',
@@ -258,18 +336,17 @@ export default function KasMasjidPage() {
                         <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl">
                             <h3 className="text-lg font-bold text-gray-900 mb-4">Export Data Kas</h3>
 
-                            {/* Export Type Tabs */}
                             <div className="flex bg-gray-100 p-1 rounded-xl mb-4">
-                                {(['semua', 'bulan', 'tahun'] as const).map((type) => (
+                                {(['semua', 'bulan', 'tahun', 'event'] as const).map((type) => (
                                     <button
                                         key={type}
-                                        onClick={() => setExportType(type)}
-                                        className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition ${exportType === type
+                                        onClick={() => setExportType(type as any)}
+                                        className={`flex-1 py-2 px-2 rounded-lg text-xs font-bold transition ${exportType === type
                                             ? 'bg-emerald-500 text-white shadow'
                                             : 'text-gray-600 hover:bg-gray-200'
                                             }`}
                                     >
-                                        {type === 'semua' ? '📊 Semua' : type === 'bulan' ? '📅 Bulanan' : '📆 Tahunan'}
+                                        {type === 'semua' ? '📊 Semua' : type === 'bulan' ? '📅 Bulan' : type === 'tahun' ? '📆 Tahun' : '🎪 Event'}
                                     </button>
                                 ))}
                             </div>
@@ -320,6 +397,29 @@ export default function KasMasjidPage() {
                                 </div>
                             )}
 
+                            {/* Event Selector */}
+                            {exportType === 'event' && (
+                                <div className="mb-4">
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Pilih Event</label>
+                                    {events.length === 0 ? (
+                                        <p className="text-sm text-gray-500 py-2">Tidak ada event tersedia</p>
+                                    ) : (
+                                        <select
+                                            value={selectedEventId || ''}
+                                            onChange={(e) => setSelectedEventId(e.target.value ? Number(e.target.value) : null)}
+                                            className="input w-full"
+                                        >
+                                            <option value="">-- Pilih Event --</option>
+                                            {events.map((ev) => (
+                                                <option key={ev.id} value={ev.id}>
+                                                    {ev.nama} ({ev.status === 'aktif' ? 'Aktif' : 'Selesai'})
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => setShowExportModal(false)}
@@ -328,10 +428,11 @@ export default function KasMasjidPage() {
                                     Batal
                                 </button>
                                 <button
-                                    onClick={() => exportToCSV(exportType)}
-                                    className="flex-1 p-3 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 font-semibold transition"
+                                    onClick={() => exportType === 'event' ? exportEventToCSV() : exportToCSV(exportType)}
+                                    disabled={exportType === 'event' && (!selectedEventId || isExportingEvent)}
+                                    className="flex-1 p-3 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Download CSV
+                                    {isExportingEvent ? 'Mengekspor...' : 'Download CSV'}
                                 </button>
                             </div>
                         </div>

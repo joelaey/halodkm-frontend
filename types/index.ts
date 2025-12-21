@@ -76,3 +76,53 @@ export interface InfoPublik {
     tanggal: string;
     created_at?: string;
 }
+
+export interface PendudukKhusus {
+    id: number;
+    nik: string;
+    nama: string;
+    jenis_kelamin: 'Laki-laki' | 'Perempuan';
+    alamat?: string;
+    no_hp?: string;
+    label: 'kontrak' | 'pedagang' | 'warga_dusun_lain';
+    keterangan?: string;
+    created_at?: string;
+}
+
+export interface Event {
+    id: number;
+    nama: string;
+    deskripsi?: string;
+    tipe: 'penggalangan_dana' | 'distribusi';
+    tanggal_mulai: string;
+    tanggal_selesai?: string;
+    status: 'aktif' | 'selesai';
+    total_masuk?: number;
+    total_keluar?: number;
+    saldo?: number;
+    total_recipients?: number;
+    created_at?: string;
+}
+
+export interface EventTransaction {
+    id: number;
+    event_id: number;
+    type: 'masuk' | 'keluar';
+    amount: number;
+    description: string;
+    tanggal: string;
+    created_at?: string;
+}
+
+export interface EventRecipient {
+    id: number;
+    event_id: number;
+    nama: string;
+    alamat?: string;
+    no_hp?: string;
+    jenis_bantuan?: string;
+    jumlah?: string;
+    keterangan?: string;
+    created_at?: string;
+}
+

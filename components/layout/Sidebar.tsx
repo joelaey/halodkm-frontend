@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, DollarSign, LogOut, Bookmark, X, Users, Shield, ClipboardList, HelpCircle } from 'lucide-react';
+import { Home, DollarSign, LogOut, Bookmark, X, Users, Shield, ClipboardList, HelpCircle, UserCheck, Calendar } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
 import { usePathname } from 'next/navigation';
@@ -20,7 +20,9 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
     const menuItems = [
         { icon: Home, label: 'Dashboard', page: '/dashboard', adminOnly: false },
         { icon: DollarSign, label: 'Kas Masjid', page: '/kas-masjid', adminOnly: false },
-        { icon: Users, label: 'Data Keluarga', page: '/keluarga', adminOnly: true },
+        { icon: Calendar, label: 'Keuangan Event', page: '/event-keuangan', adminOnly: true },
+        { icon: Users, label: 'Penduduk Tetap', page: '/keluarga', adminOnly: true },
+        { icon: UserCheck, label: 'Penduduk Khusus', page: '/penduduk-khusus', adminOnly: true },
         { icon: Bookmark, label: 'Informasi', page: '/informasi', adminOnly: false },
         { icon: HelpCircle, label: 'Bantuan', page: '/bantuan', jamaahOnly: true },
         { icon: Shield, label: 'Users', page: '/users', adminOnly: true },

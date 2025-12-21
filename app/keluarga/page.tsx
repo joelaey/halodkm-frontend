@@ -18,6 +18,7 @@ export default function KeluargaPage() {
     const [showForm, setShowForm] = useState(false);
     const [showMemberForm, setShowMemberForm] = useState<number | null>(null);
     const [isExporting, setIsExporting] = useState(false);
+    const [showExportModal, setShowExportModal] = useState(false);
     const [editingFamily, setEditingFamily] = useState<Family | null>(null);
     const [editingMember, setEditingMember] = useState<{ familyId: number; member: FamilyMember } | null>(null);
 
@@ -150,12 +151,102 @@ export default function KeluargaPage() {
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `data_keluarga_lengkap_${new Date().toISOString().split('T')[0]}.csv`;
+            link.download = `data_penduduk_tetap_${new Date().toISOString().split('T')[0]}.csv`;
             link.click();
             URL.revokeObjectURL(url);
         } catch (error) {
             console.error('Error exporting CSV:', error);
             alert('Gagal mengekspor data. Silakan coba lagi.');
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    // Export with options: 'tetap' | 'khusus' | 'semua'
+    const exportWithOption = async (type: 'tetap' | 'khusus' | 'semua') => {
+        setIsExporting(true);
+        setShowExportModal(false);
+        try {
+            const headers = ['Tipe', 'No KK/NIK', 'Nama', 'RT/Label', 'Alamat', 'No HP', 'Hubungan/Keterangan', 'Jenis Kelamin', 'Tanggal Lahir'];
+            const rows: string[][] = [];
+
+            // Get Penduduk Tetap
+            if (type === 'tetap' || type === 'semua') {
+                const allMembersPromises = families.map(async (family) => {
+                    try {
+                        const response = await apiService.getFamilyMembers(family.id);
+                        return { family, members: response.success ? response.data : [] };
+                    } catch {
+                        return { family, members: [] };
+                    }
+                });
+
+                const allMembersData = await Promise.all(allMembersPromises);
+                allMembersData.forEach(({ family, members }) => {
+                    if (members && members.length > 0) {
+                        members.forEach((member) => {
+                            rows.push([
+                                'Penduduk Tetap',
+                                member.nik,
+                                member.nama,
+                                family.rt,
+                                family.alamat || '-',
+                                family.no_hp || '-',
+                                member.hubungan,
+                                member.jenis_kelamin,
+                                member.tanggal_lahir || '-'
+                            ]);
+                        });
+                    }
+                });
+            }
+
+            // Get Penduduk Khusus
+            if (type === 'khusus' || type === 'semua') {
+                const pkResponse = await apiService.getPendudukKhusus();
+                if (pkResponse.success && pkResponse.data) {
+                    const labelMap: Record<string, string> = {
+                        'kontrak': 'Kontrak',
+                        'pedagang': 'Pedagang',
+                        'warga_dusun_lain': 'Warga Dusun Lain'
+                    };
+                    pkResponse.data.data.forEach((p) => {
+                        rows.push([
+                            'Penduduk Khusus',
+                            p.nik,
+                            p.nama,
+                            labelMap[p.label] || p.label,
+                            p.alamat || '-',
+                            p.no_hp || '-',
+                            p.keterangan || '-',
+                            p.jenis_kelamin,
+                            '-'
+                        ]);
+                    });
+                }
+            }
+
+            if (rows.length === 0) {
+                alert('Tidak ada data untuk di-export');
+                return;
+            }
+
+            const csvContent = [
+                headers.join(','),
+                ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+            ].join('\n');
+
+            const filename = type === 'tetap' ? 'penduduk_tetap' : type === 'khusus' ? 'penduduk_khusus' : 'semua_penduduk';
+            const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Error exporting:', error);
+            alert('Gagal mengekspor data.');
         } finally {
             setIsExporting(false);
         }
@@ -312,12 +403,12 @@ export default function KeluargaPage() {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <h2 className="text-2xl font-bold text-gray-900">Data Keluarga</h2>
-                        <p className="text-gray-600 mt-1">Daftar kepala keluarga dan anggota</p>
+                        <h2 className="text-2xl font-bold text-gray-900">Data Penduduk Tetap</h2>
+                        <p className="text-gray-600 mt-1">Daftar kepala keluarga dan anggota keluarga tetap</p>
                     </div>
                     <div className="flex gap-2">
                         <Button
-                            onClick={exportToCSV}
+                            onClick={() => setShowExportModal(true)}
                             variant="secondary"
                             icon={Download}
                             disabled={isExporting}
@@ -331,6 +422,48 @@ export default function KeluargaPage() {
                         )}
                     </div>
                 </div>
+
+                {/* Export Modal */}
+                {showExportModal && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+                            <h3 className="text-lg font-bold mb-4">Export Data Penduduk</h3>
+                            <p className="text-gray-600 mb-6">Pilih data yang ingin di-export:</p>
+                            <div className="space-y-3">
+                                <button
+                                    onClick={() => exportWithOption('tetap')}
+                                    disabled={isExporting}
+                                    className="w-full p-4 text-left rounded-xl border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all"
+                                >
+                                    <p className="font-semibold">📌 Penduduk Tetap Saja</p>
+                                    <p className="text-sm text-gray-500">Export data keluarga dan anggota</p>
+                                </button>
+                                <button
+                                    onClick={() => exportWithOption('khusus')}
+                                    disabled={isExporting}
+                                    className="w-full p-4 text-left rounded-xl border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all"
+                                >
+                                    <p className="font-semibold">🏷️ Penduduk Khusus Saja</p>
+                                    <p className="text-sm text-gray-500">Export kontrak, pedagang, warga dusun lain</p>
+                                </button>
+                                <button
+                                    onClick={() => exportWithOption('semua')}
+                                    disabled={isExporting}
+                                    className="w-full p-4 text-left rounded-xl border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50 transition-all"
+                                >
+                                    <p className="font-semibold">👥 Semua Penduduk</p>
+                                    <p className="text-sm text-gray-500">Export penduduk tetap + penduduk khusus</p>
+                                </button>
+                            </div>
+                            <button
+                                onClick={() => setShowExportModal(false)}
+                                className="w-full mt-4 py-2 text-gray-600 hover:text-gray-800"
+                            >
+                                Batal
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Add/Edit Family Form */}
                 {showForm && isAdmin && (
@@ -467,7 +600,7 @@ export default function KeluargaPage() {
                 {isLoading ? (
                     <div className="text-center py-12">
                         <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-500"></div>
-                        <p className="mt-4 text-gray-600">Memuat data keluarga...</p>
+                        <p className="mt-4 text-gray-600">Memuat data penduduk tetap...</p>
                     </div>
                 ) : families.length === 0 ? (
                     <div className="text-center py-12 bg-gray-50 rounded-3xl">
