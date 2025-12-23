@@ -5,6 +5,7 @@ import { Menu } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { useAuth } from '@/lib/auth-context';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { PWAInstallPrompt } from '@/components/ui/PWAInstallPrompt';
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
@@ -39,6 +40,9 @@ export function DashboardLayout({ children, requiredRole }: DashboardLayoutProps
                     </div>
                 </main>
             </div>
+
+            {/* PWA Install Prompt */}
+            <PWAInstallPrompt />
         </ProtectedRoute>
     );
 }
