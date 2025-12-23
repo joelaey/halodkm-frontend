@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { apiService } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { Users, Plus, Trash2, X, Shield, User as UserIcon, Key, Eye, EyeOff } from 'lucide-react';
-import { Toast, useToast } from '@/components/ui/Toast';
+import { Toast, ConfirmDialog } from '@/components/ui/Toast';
 
 interface UserData {
     id: number;
@@ -23,7 +23,20 @@ export default function UsersPage() {
     const [users, setUsers] = useState<UserData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
-    const { toast, showToast, hideToast } = useToast();
+
+    // Toast state
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
+
+    const showToast = (message: string, type: 'success' | 'error' | 'warning' | 'info') => {
+        setToast({ message, type });
+    };
+
+    // Delete confirm dialog state
+    const [deleteDialog, setDeleteDialog] = useState<{
+        isOpen: boolean;
+        user: UserData | null;
+        isLoading: boolean;
+    }>({ isOpen: false, user: null, isLoading: false });
 
     // Reset password state
     const [showResetModal, setShowResetModal] = useState(false);
@@ -82,19 +95,27 @@ export default function UsersPage() {
         }
     };
 
-    const handleDelete = async (id: number, username: string) => {
-        if (id === user?.id) {
+    const openDeleteDialog = (u: UserData) => {
+        if (u.id === user?.id) {
             showToast('Tidak bisa menghapus akun sendiri!', 'warning');
             return;
         }
-        if (!confirm(`Hapus user "${username}"?`)) return;
+        setDeleteDialog({ isOpen: true, user: u, isLoading: false });
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!deleteDialog.user) return;
+
+        setDeleteDialog(prev => ({ ...prev, isLoading: true }));
         try {
-            await apiService.deleteUser(id);
+            await apiService.deleteUser(deleteDialog.user.id);
             showToast('User berhasil dihapus', 'success');
+            setDeleteDialog({ isOpen: false, user: null, isLoading: false });
             fetchUsers();
         } catch (error) {
             console.error('Failed to delete user:', error);
             showToast('Gagal menghapus user', 'error');
+            setDeleteDialog(prev => ({ ...prev, isLoading: false }));
         }
     };
 
@@ -278,7 +299,7 @@ export default function UsersPage() {
                                                 <Key className="w-4 h-4 text-gray-400 group-hover:text-blue-600" />
                                             </button>
                                             <button
-                                                onClick={() => handleDelete(u.id, u.username)}
+                                                onClick={() => openDeleteDialog(u)}
                                                 className="p-2 hover:bg-red-50 rounded-lg transition-colors group"
                                                 title="Hapus User"
                                             >
@@ -292,6 +313,19 @@ export default function UsersPage() {
                     </div>
                 )}
             </div>
+
+            {/* Delete Confirm Dialog */}
+            <ConfirmDialog
+                isOpen={deleteDialog.isOpen}
+                title="Hapus User?"
+                message={`Yakin ingin menghapus user "${deleteDialog.user?.full_name}" (@${deleteDialog.user?.username})? Aksi ini tidak dapat dibatalkan.`}
+                confirmText="Hapus"
+                cancelText="Batal"
+                type="danger"
+                isLoading={deleteDialog.isLoading}
+                onConfirm={handleConfirmDelete}
+                onCancel={() => setDeleteDialog({ isOpen: false, user: null, isLoading: false })}
+            />
 
             {/* Reset Password Modal */}
             {showResetModal && resetUser && (
@@ -348,7 +382,14 @@ export default function UsersPage() {
                 </div>
             )}
 
-            <Toast toast={toast} onClose={hideToast} />
+            {/* Toast */}
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    onClose={() => setToast(null)}
+                />
+            )}
         </DashboardLayout>
     );
 }
