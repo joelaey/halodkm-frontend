@@ -336,13 +336,12 @@ export default function EventKeuanganPage() {
                                         </div>
 
                                         {/* Actions */}
-                                        <div className="flex items-start gap-1 ml-4">
+                                        <div className="flex items-start gap-2 ml-4">
                                             <button
                                                 onClick={() => router.push(`/event/${event.id}`)}
-                                                className="p-2 hover:bg-emerald-50 rounded-lg transition-colors group"
-                                                title="Lihat Detail"
+                                                className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm"
                                             >
-                                                <Eye className="w-5 h-5 text-gray-400 group-hover:text-emerald-600" />
+                                                Kelola Event
                                             </button>
                                             {isAdmin && event.status === 'aktif' && (
                                                 <>

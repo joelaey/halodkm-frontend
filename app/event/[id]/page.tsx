@@ -5,11 +5,11 @@ import { useParams, useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Toast, type ToastType } from '@/components/ui/Toast';
+import { Toast, ConfirmDialog, type ToastType } from '@/components/ui/Toast';
 import { apiService } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import type { Event, EventTransaction, EventRecipient } from '@/types';
-import { ArrowLeft, Plus, X, TrendingUp, TrendingDown, CheckCircle, Download, Edit2, Trash2, Calendar, Users, DollarSign, UserPlus, Phone, MapPin } from 'lucide-react';
+import { ArrowLeft, Plus, X, TrendingUp, TrendingDown, CheckCircle, Download, Edit2, Trash2, Calendar, Users, DollarSign, UserPlus, Phone, MapPin, FileText } from 'lucide-react';
 
 type TabType = 'keuangan' | 'penerima';
 
@@ -48,12 +48,27 @@ export default function EventDetailPage() {
         keterangan: '',
     });
 
+    // Complete event states
     const [isCompleting, setIsCompleting] = useState(false);
-    const [isExporting, setIsExporting] = useState(false);
-    const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+    const [showDocModal, setShowDocModal] = useState(false);
+    const [docFormData, setDocFormData] = useState({
+        title: '',
+        content: '',
+    });
+    const [isSubmittingDoc, setIsSubmittingDoc] = useState(false);
 
-    const showToast = (message: string, type: ToastType) => {
-        setToast({ message, type });
+    const [isExporting, setIsExporting] = useState(false);
+    const [toast, setToast] = useState<{ message: string; type: ToastType; title?: string } | null>(null);
+    const [confirmDialog, setConfirmDialog] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        isLoading: boolean;
+    }>({ isOpen: false, title: '', message: '', onConfirm: () => { }, isLoading: false });
+
+    const showToast = (message: string, type: ToastType, title?: string) => {
+        setToast({ message, type, title });
     };
 
     const isAdmin = user?.role === 'admin';
@@ -84,10 +99,14 @@ export default function EventDetailPage() {
         try {
             const response = await apiService.getEventRecipients(eventId);
             if (response.success && response.data) {
-                setRecipients(response.data.data);
+                // Backend returns { success, data: [...], total } directly
+                // Handle both cases for compatibility
+                const recipientData = Array.isArray(response.data) ? response.data : (response.data as any).data || [];
+                setRecipients(recipientData);
             }
         } catch (error) {
             console.error('Error fetching recipients:', error);
+            // Don't show error toast for recipients as it's secondary data
         }
     };
 
@@ -179,29 +198,75 @@ export default function EventDetailPage() {
         }
     };
 
-    const handleComplete = async () => {
+    const handleCompleteClick = () => {
         if (!event) return;
         if (summary.saldo < 0) {
-            alert('Tidak dapat menyelesaikan event dengan saldo negatif.');
+            showToast('Tidak dapat menyelesaikan event dengan saldo negatif.', 'warning');
             return;
         }
-        const msg = summary.saldo > 0
-            ? `Selesaikan event "${event.nama}"? Saldo ${formatCurrency(summary.saldo)} akan ditransfer ke Kas Masjid.`
-            : `Selesaikan event "${event.nama}"?`;
-        if (!confirm(msg)) return;
 
-        setIsCompleting(true);
-        try {
-            const response = await apiService.completeEvent(eventId);
-            if (response.success) {
-                showToast(response.message || 'Event berhasil diselesaikan.', 'success');
-                fetchEventDetail();
+        const msg = summary.saldo > 0
+            ? `Saldo ${formatCurrency(summary.saldo)} akan ditransfer ke Kas Masjid.`
+            : 'Yakin ingin menyelesaikan event ini?';
+
+        setConfirmDialog({
+            isOpen: true,
+            title: `Selesaikan "${event.nama}"?`,
+            message: msg,
+            isLoading: false,
+            onConfirm: async () => {
+                setConfirmDialog(prev => ({ ...prev, isLoading: true }));
+                try {
+                    const response = await apiService.completeEvent(eventId);
+                    if (response.success) {
+                        setConfirmDialog(prev => ({ ...prev, isOpen: false, isLoading: false }));
+                        showToast(response.message || 'Event berhasil diselesaikan!', 'success');
+
+                        // Show documentation modal
+                        setDocFormData({
+                            title: `Laporan Event: ${event.nama}`,
+                            content: `Event "${event.nama}" telah selesai dilaksanakan.\n\nRincian Keuangan:\n- Total Pemasukan: ${formatCurrency(summary.total_masuk)}\n- Total Pengeluaran: ${formatCurrency(summary.total_keluar)}\n- Saldo Akhir: ${formatCurrency(summary.saldo)}${summary.saldo > 0 ? ' (ditransfer ke Kas Masjid)' : ''}${event.tipe === 'distribusi' ? `\n\nTotal Penerima: ${recipients.length} orang` : ''}\n\n--- Tambahkan notulensi/dokumentasi di bawah ini ---\n`,
+                        });
+                        setShowDocModal(true);
+                        fetchEventDetail();
+                    }
+                } catch (error: any) {
+                    showToast(error?.response?.data?.message || 'Gagal menyelesaikan event.', 'error');
+                } finally {
+                    setConfirmDialog(prev => ({ ...prev, isLoading: false }));
+                }
             }
-        } catch (error: any) {
-            showToast(error?.response?.data?.message || 'Gagal menyelesaikan event.', 'error');
-        } finally {
-            setIsCompleting(false);
+        });
+    };
+
+    const handleSubmitDoc = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!docFormData.title.trim() || !docFormData.content.trim()) {
+            showToast('Judul dan isi laporan harus diisi', 'warning');
+            return;
         }
+
+        setIsSubmittingDoc(true);
+        try {
+            await apiService.createInfoPublik({
+                title: docFormData.title,
+                content: docFormData.content,
+                category: 'Kegiatan Masjid',
+                tanggal: new Date().toISOString().split('T')[0],
+            });
+            showToast('Laporan event berhasil dipublikasikan ke Informasi!', 'success');
+            setShowDocModal(false);
+            setDocFormData({ title: '', content: '' });
+        } catch (error: any) {
+            showToast(error?.response?.data?.message || 'Gagal menyimpan laporan.', 'error');
+        } finally {
+            setIsSubmittingDoc(false);
+        }
+    };
+
+    const handleSkipDoc = () => {
+        setShowDocModal(false);
+        setDocFormData({ title: '', content: '' });
     };
 
     const exportToCSV = async () => {
@@ -289,9 +354,19 @@ export default function EventDetailPage() {
                     <Toast
                         message={toast.message}
                         type={toast.type}
+                        title={toast.title}
                         onClose={() => setToast(null)}
                     />
                 )}
+                <ConfirmDialog
+                    isOpen={confirmDialog.isOpen}
+                    title={confirmDialog.title}
+                    message={confirmDialog.message}
+                    onConfirm={confirmDialog.onConfirm}
+                    onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+                    isLoading={confirmDialog.isLoading}
+                    type="warning"
+                />
                 {/* Header */}
                 <div className="flex items-center gap-4">
                     <button onClick={() => router.push('/event')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -351,8 +426,8 @@ export default function EventDetailPage() {
                         {isExporting ? 'Mengekspor...' : 'Export CSV'}
                     </Button>
                     {isAdmin && event.status === 'aktif' && (
-                        <Button onClick={handleComplete} variant="secondary" icon={CheckCircle} disabled={isCompleting} className="!bg-green-500 !text-white hover:!bg-green-600">
-                            {isCompleting ? 'Memproses...' : 'Selesaikan Event'}
+                        <Button onClick={handleCompleteClick} variant="secondary" icon={CheckCircle} className="!bg-green-500 !text-white hover:!bg-green-600">
+                            Selesaikan Event
                         </Button>
                     )}
                 </div>
@@ -556,6 +631,60 @@ export default function EventDetailPage() {
                                     {summary.saldo > 0 && ` Sisa dana sebesar ${formatCurrency(summary.saldo)} telah ditransfer ke Kas Masjid.`}
                                 </p>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Documentation Modal */}
+                {showDocModal && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl animate-slide-up">
+                            <div className="bg-gradient-to-r from-emerald-500 to-green-500 p-6">
+                                <div className="flex items-center gap-3 text-white">
+                                    <FileText className="w-8 h-8" />
+                                    <div>
+                                        <h3 className="text-xl font-bold">Publikasikan Laporan Event</h3>
+                                        <p className="text-emerald-100 text-sm">Buat notulensi/dokumentasi untuk transparansi</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <form onSubmit={handleSubmitDoc} className="p-6 space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">Judul Laporan</label>
+                                    <input
+                                        type="text"
+                                        className="input"
+                                        value={docFormData.title}
+                                        onChange={(e) => setDocFormData({ ...docFormData, title: e.target.value })}
+                                        placeholder="Judul laporan event"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">Isi Laporan / Notulensi</label>
+                                    <textarea
+                                        className="input h-48 resize-none"
+                                        value={docFormData.content}
+                                        onChange={(e) => setDocFormData({ ...docFormData, content: e.target.value })}
+                                        placeholder="Tuliskan dokumentasi kegiatan, notulensi rapat, atau catatan penting lainnya..."
+                                        required
+                                    />
+                                </div>
+
+                                <div className="flex gap-3 pt-4 border-t border-gray-100">
+                                    <Button type="submit" className="flex-1" disabled={isSubmittingDoc}>
+                                        {isSubmittingDoc ? 'Menyimpan...' : 'Publikasikan ke Informasi'}
+                                    </Button>
+                                    <Button type="button" variant="secondary" onClick={handleSkipDoc}>
+                                        Lewati
+                                    </Button>
+                                </div>
+
+                                <p className="text-xs text-gray-500 text-center">
+                                    Laporan akan dipublikasikan ke halaman Informasi & Kegiatan
+                                </p>
+                            </form>
                         </div>
                     </div>
                 )}
