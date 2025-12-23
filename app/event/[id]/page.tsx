@@ -64,6 +64,11 @@ export default function EventDetailPage() {
     const [isSearching, setIsSearching] = useState(false);
     const [showSearchDropdown, setShowSearchDropdown] = useState(false);
 
+    // Recipient search states
+    const [recipientSearchQuery, setRecipientSearchQuery] = useState('');
+    const [recipientSearchResults, setRecipientSearchResults] = useState<PendudukSearchResult[]>([]);
+    const [showRecipientSearchDropdown, setShowRecipientSearchDropdown] = useState(false);
+
     const ROLE_OPTIONS = ['Ketua', 'Sekretaris', 'Bendahara', 'Anggota'];
 
     // Complete event states
@@ -173,6 +178,36 @@ export default function EventDetailPage() {
         setShowSearchDropdown(false);
     };
 
+    // Recipient search handlers
+    const handleSearchRecipient = async (query: string) => {
+        setRecipientSearchQuery(query);
+        if (query.length < 2) {
+            setRecipientSearchResults([]);
+            setShowRecipientSearchDropdown(false);
+            return;
+        }
+        try {
+            const response = await apiService.searchPenduduk(query);
+            if (response.success && response.data) {
+                const results = Array.isArray(response.data) ? response.data : [];
+                setRecipientSearchResults(results);
+                setShowRecipientSearchDropdown(true);
+            }
+        } catch (error) {
+            console.error('Error searching penduduk for recipient:', error);
+        }
+    };
+
+    const selectPendudukForRecipient = (person: PendudukSearchResult) => {
+        setRecipientFormData({
+            ...recipientFormData,
+            nama: person.nama,
+            no_hp: person.no_hp || '',
+        });
+        setRecipientSearchQuery(person.nama);
+        setShowRecipientSearchDropdown(false);
+    };
+
     // Transaction handlers
     const resetTransForm = () => {
         setTransFormData({ type: 'masuk', amount: '', description: '', tanggal: new Date().toISOString().split('T')[0] });
@@ -217,6 +252,9 @@ export default function EventDetailPage() {
     // Recipient handlers
     const resetRecipientForm = () => {
         setRecipientFormData({ nama: '', alamat: '', no_hp: '', jenis_bantuan: '', jumlah: '', keterangan: '' });
+        setRecipientSearchQuery('');
+        setRecipientSearchResults([]);
+        setShowRecipientSearchDropdown(false);
         setEditingRecipient(null);
     };
 
@@ -868,6 +906,43 @@ export default function EventDetailPage() {
                             <Card className="border-purple-200 ring-4 ring-purple-50">
                                 <h3 className="font-bold text-lg mb-4">{editingRecipient ? 'Edit Penerima' : 'Tambah Penerima'}</h3>
                                 <form onSubmit={handleSubmitRecipient} className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">Cari Penduduk (opsional)</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                                <Search className="w-4 h-4 text-gray-400" />
+                                            </div>
+                                            <input
+                                                type="text"
+                                                className="input !pl-10"
+                                                value={recipientSearchQuery}
+                                                onChange={(e) => handleSearchRecipient(e.target.value)}
+                                                onFocus={() => recipientSearchQuery.length >= 2 && setShowRecipientSearchDropdown(true)}
+                                                placeholder="Ketik nama untuk mencari..."
+                                            />
+                                            {showRecipientSearchDropdown && recipientSearchResults.length > 0 && (
+                                                <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                                                    {recipientSearchResults.map((person) => (
+                                                        <button
+                                                            key={`${person.source_type}-${person.id}`}
+                                                            type="button"
+                                                            onClick={() => selectPendudukForRecipient(person)}
+                                                            className="w-full px-4 py-3 text-left hover:bg-purple-50 flex items-center justify-between border-b last:border-b-0"
+                                                        >
+                                                            <div>
+                                                                <p className="font-medium text-gray-900">{person.nama}</p>
+                                                                <p className="text-xs text-gray-500">{person.no_hp || 'No HP tidak tersedia'}</p>
+                                                            </div>
+                                                            <span className={`text-xs px-2 py-1 rounded-full ${person.source_type === 'penduduk_tetap' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'}`}>
+                                                                {person.source_type === 'penduduk_tetap' ? 'Tetap' : 'Khusus'}
+                                                            </span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-1">Atau isi manual di bawah</p>
+                                    </div>
                                     <div className="grid md:grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-sm font-bold text-gray-700 mb-2">Nama Penerima *</label>
