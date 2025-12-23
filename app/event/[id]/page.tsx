@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Toast, type ToastType } from '@/components/ui/Toast';
 import { apiService } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import type { Event, EventTransaction, EventRecipient } from '@/types';
@@ -49,6 +50,11 @@ export default function EventDetailPage() {
 
     const [isCompleting, setIsCompleting] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
+    const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+
+    const showToast = (message: string, type: ToastType) => {
+        setToast({ message, type });
+    };
 
     const isAdmin = user?.role === 'admin';
 
@@ -68,6 +74,7 @@ export default function EventDetailPage() {
             }
         } catch (error) {
             console.error('Error fetching event:', error);
+            showToast('Gagal memuat data event', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -105,11 +112,12 @@ export default function EventDetailPage() {
             } else {
                 await apiService.createEventTransaction(eventId, data);
             }
+            showToast(editingTransaction ? 'Transaksi berhasil diperbarui' : 'Transaksi berhasil ditambahkan', 'success');
             resetTransForm();
             setShowTransForm(false);
             fetchEventDetail();
         } catch (error: any) {
-            alert(error?.response?.data?.message || 'Gagal menyimpan transaksi.');
+            showToast(error?.response?.data?.message || 'Gagal menyimpan transaksi.', 'error');
         }
     };
 
@@ -117,9 +125,10 @@ export default function EventDetailPage() {
         if (!confirm('Hapus transaksi ini?')) return;
         try {
             await apiService.deleteEventTransaction(eventId, transId);
+            showToast('Transaksi berhasil dihapus', 'success');
             fetchEventDetail();
         } catch (error: any) {
-            alert(error?.response?.data?.message || 'Gagal menghapus transaksi.');
+            showToast(error?.response?.data?.message || 'Gagal menghapus transaksi.', 'error');
         }
     };
 
@@ -150,11 +159,12 @@ export default function EventDetailPage() {
             } else {
                 await apiService.createEventRecipient(eventId, recipientFormData);
             }
+            showToast(editingRecipient ? 'Penerima berhasil diperbarui' : 'Penerima berhasil ditambahkan', 'success');
             resetRecipientForm();
             setShowRecipientForm(false);
             fetchRecipients();
         } catch (error: any) {
-            alert(error?.response?.data?.message || 'Gagal menyimpan penerima.');
+            showToast(error?.response?.data?.message || 'Gagal menyimpan penerima.', 'error');
         }
     };
 
@@ -162,9 +172,10 @@ export default function EventDetailPage() {
         if (!confirm('Hapus penerima ini?')) return;
         try {
             await apiService.deleteEventRecipient(eventId, recId);
+            showToast('Penerima berhasil dihapus', 'success');
             fetchRecipients();
         } catch (error: any) {
-            alert(error?.response?.data?.message || 'Gagal menghapus penerima.');
+            showToast(error?.response?.data?.message || 'Gagal menghapus penerima.', 'error');
         }
     };
 
@@ -183,11 +194,11 @@ export default function EventDetailPage() {
         try {
             const response = await apiService.completeEvent(eventId);
             if (response.success) {
-                alert(response.message || 'Event berhasil diselesaikan.');
+                showToast(response.message || 'Event berhasil diselesaikan.', 'success');
                 fetchEventDetail();
             }
         } catch (error: any) {
-            alert(error?.response?.data?.message || 'Gagal menyelesaikan event.');
+            showToast(error?.response?.data?.message || 'Gagal menyelesaikan event.', 'error');
         } finally {
             setIsCompleting(false);
         }
@@ -239,7 +250,7 @@ export default function EventDetailPage() {
             link.click();
             URL.revokeObjectURL(url);
         } catch (error) {
-            alert('Gagal mengekspor data.');
+            showToast('Gagal mengekspor data.', 'error');
         } finally {
             setIsExporting(false);
         }
@@ -265,7 +276,7 @@ export default function EventDetailPage() {
             <DashboardLayout>
                 <div className="text-center py-12">
                     <p className="text-gray-600">Event tidak ditemukan</p>
-                    <Button onClick={() => router.push('/event-keuangan')} className="mt-4">Kembali</Button>
+                    <Button onClick={() => router.push('/event')} className="mt-4">Kembali</Button>
                 </div>
             </DashboardLayout>
         );
@@ -274,9 +285,16 @@ export default function EventDetailPage() {
     return (
         <DashboardLayout>
             <div className="space-y-6">
+                {toast && (
+                    <Toast
+                        message={toast.message}
+                        type={toast.type}
+                        onClose={() => setToast(null)}
+                    />
+                )}
                 {/* Header */}
                 <div className="flex items-center gap-4">
-                    <button onClick={() => router.push('/event-keuangan')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                    <button onClick={() => router.push('/event')} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
                         <ArrowLeft className="w-5 h-5 text-gray-600" />
                     </button>
                     <div className="flex-1">

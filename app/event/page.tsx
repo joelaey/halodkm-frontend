@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Toast, type ToastType } from '@/components/ui/Toast';
 import { apiService } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import type { Event } from '@/types';
@@ -23,6 +24,11 @@ export default function EventKeuanganPage() {
     const [showForm, setShowForm] = useState(false);
     const [filterStatus, setFilterStatus] = useState<string>('');
     const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+    const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+
+    const showToast = (message: string, type: ToastType) => {
+        setToast({ message, type });
+    };
 
     const [formData, setFormData] = useState({
         nama: '',
@@ -46,6 +52,7 @@ export default function EventKeuanganPage() {
             }
         } catch (error) {
             console.error('Error fetching events:', error);
+            showToast('Gagal memuat data event', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -80,12 +87,13 @@ export default function EventKeuanganPage() {
             } else {
                 await apiService.createEvent(formData);
             }
+            showToast(editingEvent ? 'Event berhasil diperbarui' : 'Event berhasil dibuat', 'success');
             resetForm();
             setShowForm(false);
             fetchEvents();
         } catch (error: any) {
             console.error('Failed to save event:', error);
-            alert(error?.response?.data?.message || 'Gagal menyimpan event.');
+            showToast(error?.response?.data?.message || 'Gagal menyimpan event.', 'error');
         }
     };
 
@@ -93,10 +101,11 @@ export default function EventKeuanganPage() {
         if (!confirm(`Hapus event "${nama}"? Event yang memiliki transaksi tidak dapat dihapus.`)) return;
         try {
             await apiService.deleteEvent(id);
+            showToast('Event berhasil dihapus', 'success');
             fetchEvents();
         } catch (error: any) {
             console.error('Failed to delete:', error);
-            alert(error?.response?.data?.message || 'Gagal menghapus event.');
+            showToast(error?.response?.data?.message || 'Gagal menghapus event.', 'error');
         }
     };
 
@@ -121,6 +130,13 @@ export default function EventKeuanganPage() {
     return (
         <DashboardLayout>
             <div className="space-y-6">
+                {toast && (
+                    <Toast
+                        message={toast.message}
+                        type={toast.type}
+                        onClose={() => setToast(null)}
+                    />
+                )}
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
@@ -175,8 +191,8 @@ export default function EventKeuanganPage() {
                                                 type="button"
                                                 onClick={() => setFormData({ ...formData, tipe: type.value as any })}
                                                 className={`p-4 rounded-xl border-2 text-left transition-all ${formData.tipe === type.value
-                                                        ? 'border-emerald-500 bg-emerald-50'
-                                                        : 'border-gray-200 hover:border-gray-300'
+                                                    ? 'border-emerald-500 bg-emerald-50'
+                                                    : 'border-gray-200 hover:border-gray-300'
                                                     }`}
                                             >
                                                 <div className="flex items-center gap-3">
@@ -322,7 +338,7 @@ export default function EventKeuanganPage() {
                                         {/* Actions */}
                                         <div className="flex items-start gap-1 ml-4">
                                             <button
-                                                onClick={() => router.push(`/event-keuangan/${event.id}`)}
+                                                onClick={() => router.push(`/event/${event.id}`)}
                                                 className="p-2 hover:bg-emerald-50 rounded-lg transition-colors group"
                                                 title="Lihat Detail"
                                             >

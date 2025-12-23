@@ -19,8 +19,8 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
     // Menu items based on role
     const menuItems = [
         { icon: Home, label: 'Dashboard', page: '/dashboard', adminOnly: false },
-        { icon: DollarSign, label: 'Kas Masjid', page: '/kas-masjid', adminOnly: false },
-        { icon: Calendar, label: 'Keuangan Event', page: '/event-keuangan', adminOnly: true },
+        { icon: DollarSign, label: 'Keuangan', page: '/kas-masjid', adminOnly: false },
+        { icon: Calendar, label: 'Event', page: '/event', adminOnly: true },
         { icon: Users, label: 'Penduduk Tetap', page: '/keluarga', adminOnly: true },
         { icon: UserCheck, label: 'Penduduk Khusus', page: '/penduduk-khusus', adminOnly: true },
         { icon: Bookmark, label: 'Informasi', page: '/informasi', adminOnly: false },

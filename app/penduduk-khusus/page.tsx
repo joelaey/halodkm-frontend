@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Toast, type ToastType } from '@/components/ui/Toast';
 import { apiService } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import type { PendudukKhusus } from '@/types';
@@ -25,6 +26,11 @@ export default function PendudukKhususPage() {
     const [editingPenduduk, setEditingPenduduk] = useState<PendudukKhusus | null>(null);
     const [showExportModal, setShowExportModal] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
+    const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+
+    const showToast = (message: string, type: ToastType) => {
+        setToast({ message, type });
+    };
 
     const [formData, setFormData] = useState({
         nik: '',
@@ -52,6 +58,7 @@ export default function PendudukKhususPage() {
             }
         } catch (error) {
             console.error('Error fetching penduduk khusus:', error);
+            showToast('Gagal memuat data penduduk', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -92,15 +99,16 @@ export default function PendudukKhususPage() {
             } else {
                 await apiService.createPendudukKhusus(formData);
             }
+            showToast(editingPenduduk ? 'Data berhasil diperbarui' : 'Data berhasil ditambahkan', 'success');
             resetForm();
             setShowForm(false);
             fetchPenduduk();
         } catch (error: any) {
             console.error('Failed to save penduduk khusus:', error);
             if (error?.response?.data?.message) {
-                alert(error.response.data.message);
+                showToast(error.response.data.message, 'error');
             } else {
-                alert('Gagal menyimpan data. Silakan coba lagi.');
+                showToast('Gagal menyimpan data. Silakan coba lagi.', 'error');
             }
         }
     };
@@ -109,10 +117,11 @@ export default function PendudukKhususPage() {
         if (!confirm(`Hapus data "${nama}"?`)) return;
         try {
             await apiService.deletePendudukKhusus(id);
+            showToast('Data berhasil dihapus', 'success');
             fetchPenduduk();
         } catch (error) {
             console.error('Failed to delete:', error);
-            alert('Gagal menghapus data.');
+            showToast('Gagal menghapus data.', 'error');
         }
     };
 
@@ -212,6 +221,13 @@ export default function PendudukKhususPage() {
     return (
         <DashboardLayout>
             <div className="space-y-6">
+                {toast && (
+                    <Toast
+                        message={toast.message}
+                        type={toast.type}
+                        onClose={() => setToast(null)}
+                    />
+                )}
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
