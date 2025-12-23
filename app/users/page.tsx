@@ -6,7 +6,8 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { apiService } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { Users, Plus, Trash2, X, Shield, User as UserIcon } from 'lucide-react';
+import { Users, Plus, Trash2, X, Shield, User as UserIcon, Key, Eye, EyeOff } from 'lucide-react';
+import { Toast, useToast } from '@/components/ui/Toast';
 
 interface UserData {
     id: number;
@@ -22,6 +23,14 @@ export default function UsersPage() {
     const [users, setUsers] = useState<UserData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
+    const { toast, showToast, hideToast } = useToast();
+
+    // Reset password state
+    const [showResetModal, setShowResetModal] = useState(false);
+    const [resetUser, setResetUser] = useState<UserData | null>(null);
+    const [newPassword, setNewPassword] = useState('');
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [isResetting, setIsResetting] = useState(false);
 
     const [formData, setFormData] = useState({
         username: '',
@@ -65,25 +74,60 @@ export default function UsersPage() {
                 rt: 'RT 01',
             });
             setShowForm(false);
+            showToast('User berhasil ditambahkan', 'success');
             fetchUsers();
         } catch (error) {
             console.error('Failed to create user:', error);
-            alert('Gagal menambahkan user.');
+            showToast('Gagal menambahkan user', 'error');
         }
     };
 
     const handleDelete = async (id: number, username: string) => {
         if (id === user?.id) {
-            alert('Tidak bisa menghapus akun sendiri!');
+            showToast('Tidak bisa menghapus akun sendiri!', 'warning');
             return;
         }
         if (!confirm(`Hapus user "${username}"?`)) return;
         try {
             await apiService.deleteUser(id);
+            showToast('User berhasil dihapus', 'success');
             fetchUsers();
         } catch (error) {
             console.error('Failed to delete user:', error);
-            alert('Gagal menghapus user.');
+            showToast('Gagal menghapus user', 'error');
+        }
+    };
+
+    const openResetModal = (u: UserData) => {
+        setResetUser(u);
+        setNewPassword('');
+        setShowNewPassword(false);
+        setShowResetModal(true);
+    };
+
+    const handleResetPassword = async () => {
+        if (!resetUser || !newPassword) return;
+
+        if (newPassword.length < 6) {
+            showToast('Password minimal 6 karakter', 'warning');
+            return;
+        }
+
+        setIsResetting(true);
+        try {
+            const response = await apiService.resetPassword(resetUser.id, newPassword);
+            if (response.success) {
+                showToast(`Password ${resetUser.username} berhasil direset`, 'success');
+                setShowResetModal(false);
+                setResetUser(null);
+                setNewPassword('');
+            } else {
+                showToast(response.message || 'Gagal reset password', 'error');
+            }
+        } catch (error: any) {
+            showToast(error?.response?.data?.message || 'Gagal reset password', 'error');
+        } finally {
+            setIsResetting(false);
         }
     };
 
@@ -216,7 +260,7 @@ export default function UsersPage() {
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-2">
                                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${u.role === 'admin'
                                         ? 'bg-purple-100 text-purple-700'
                                         : 'bg-emerald-100 text-emerald-700'
@@ -225,12 +269,22 @@ export default function UsersPage() {
                                     </span>
 
                                     {u.id !== user?.id && (
-                                        <button
-                                            onClick={() => handleDelete(u.id, u.username)}
-                                            className="p-2 hover:bg-red-50 rounded-lg transition-colors group"
-                                        >
-                                            <Trash2 className="w-4 h-4 text-gray-400 group-hover:text-red-600" />
-                                        </button>
+                                        <>
+                                            <button
+                                                onClick={() => openResetModal(u)}
+                                                className="p-2 hover:bg-blue-50 rounded-lg transition-colors group"
+                                                title="Reset Password"
+                                            >
+                                                <Key className="w-4 h-4 text-gray-400 group-hover:text-blue-600" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(u.id, u.username)}
+                                                className="p-2 hover:bg-red-50 rounded-lg transition-colors group"
+                                                title="Hapus User"
+                                            >
+                                                <Trash2 className="w-4 h-4 text-gray-400 group-hover:text-red-600" />
+                                            </button>
+                                        </>
                                     )}
                                 </div>
                             </Card>
@@ -238,6 +292,63 @@ export default function UsersPage() {
                     </div>
                 )}
             </div>
+
+            {/* Reset Password Modal */}
+            {showResetModal && resetUser && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="p-3 bg-blue-100 rounded-xl">
+                                <Key className="w-6 h-6 text-blue-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-lg text-gray-900">Reset Password</h3>
+                                <p className="text-sm text-gray-500">@{resetUser.username}</p>
+                            </div>
+                        </div>
+
+                        <div className="mb-6">
+                            <label className="block text-sm font-bold text-gray-700 mb-2">Password Baru</label>
+                            <div className="relative">
+                                <input
+                                    type={showNewPassword ? 'text' : 'password'}
+                                    className="input w-full pr-12"
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    placeholder="Minimal 6 karakter"
+                                    minLength={6}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowNewPassword(!showNewPassword)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >
+                                    {showNewPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <Button
+                                onClick={handleResetPassword}
+                                className="flex-1"
+                                disabled={isResetting || newPassword.length < 6}
+                            >
+                                {isResetting ? 'Menyimpan...' : 'Reset Password'}
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setShowResetModal(false)}
+                                disabled={isResetting}
+                            >
+                                Batal
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <Toast toast={toast} onClose={hideToast} />
         </DashboardLayout>
     );
 }
