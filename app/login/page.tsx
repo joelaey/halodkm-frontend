@@ -184,7 +184,19 @@ export default function LoginPage() {
                                 </Button>
                             </form>
 
-                            <div className="mt-6 text-center">
+                            {/* Forgot Password */}
+                            <div className="mt-4 text-center">
+                                <a
+                                    href="https://wa.me/6281234567890?text=Halo%20Admin%2C%20saya%20lupa%20password%20akun%20HaloDKM.%20Username%20saya%3A%20"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm text-gray-500 hover:text-emerald-600 transition"
+                                >
+                                    Lupa password? Hubungi Admin
+                                </a>
+                            </div>
+
+                            <div className="mt-4 text-center">
                                 <p className="text-gray-600">
                                     Belum punya akun?{' '}
                                     <button

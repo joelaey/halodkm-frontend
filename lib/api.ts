@@ -61,6 +61,12 @@ class ApiService {
         return response;
     }
 
+    // Admin Reset Password
+    async resetPassword(userId: number, newPassword: string): Promise<ApiResponse<null>> {
+        const { data } = await this.api.post('/auth/reset-password', { userId, newPassword });
+        return data;
+    }
+
     // Dashboard
     async getDashboardStats(rw?: string): Promise<ApiResponse<{
         stats: DashboardStats;
