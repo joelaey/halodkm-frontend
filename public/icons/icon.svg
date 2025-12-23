@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#059669"/>
+  <g fill="white">
+    <!-- Mosque dome -->
+    <ellipse cx="256" cy="280" rx="140" ry="100"/>
+    <!-- Mosque base -->
+    <rect x="116" y="280" width="280" height="120" rx="8"/>
+    <!-- Main tower -->
+    <rect x="226" y="150" width="60" height="130"/>
+    <path d="M256 100 L286 150 L226 150 Z"/>
+    <!-- Crescent on top -->
+    <circle cx="256" cy="80" r="25"/>
+    <circle cx="246" cy="75" r="18" fill="#059669"/>
+    <!-- Door -->
+    <rect x="226" y="340" width="60" height="60" rx="30" ry="30" fill="#059669"/>
+    <!-- Windows -->
+    <circle cx="176" cy="320" r="15" fill="#059669"/>
+    <circle cx="336" cy="320" r="15" fill="#059669"/>
+  </g>
+</svg>
