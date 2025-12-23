@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Toast, ConfirmDialog, type ToastType } from '@/components/ui/Toast';
 import { apiService } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import type { InfoPublik } from '@/types';
@@ -17,6 +18,18 @@ export default function InformasiPage() {
     const [showForm, setShowForm] = useState(false);
     const [selectedInfo, setSelectedInfo] = useState<InfoPublik | null>(null);
     const [editingInfo, setEditingInfo] = useState<InfoPublik | null>(null);
+    const [toast, setToast] = useState<{ message: string; type: ToastType; title?: string } | null>(null);
+    const [confirmDialog, setConfirmDialog] = useState<{
+        isOpen: boolean;
+        title: string;
+        message: string;
+        onConfirm: () => void;
+        isLoading: boolean;
+    }>({ isOpen: false, title: '', message: '', onConfirm: () => { }, isLoading: false });
+
+    const showToast = (message: string, type: ToastType, title?: string) => {
+        setToast({ message, type, title });
+    };
 
     const [formData, setFormData] = useState({
         title: '',
@@ -40,6 +53,7 @@ export default function InformasiPage() {
             }
         } catch (error) {
             console.error('Error fetching info:', error);
+            showToast('Gagal memuat informasi', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -72,33 +86,47 @@ export default function InformasiPage() {
         try {
             if (editingInfo) {
                 await apiService.updateInfoPublik(editingInfo.id, formData);
+                showToast('Informasi berhasil diperbarui', 'success');
             } else {
                 await apiService.createInfoPublik(formData);
+                showToast('Informasi berhasil ditambahkan', 'success');
             }
             resetForm();
             setShowForm(false);
             fetchInfo();
         } catch (error) {
             console.error('Failed to save info:', error);
-            alert('Gagal menyimpan informasi.');
+            showToast('Gagal menyimpan informasi', 'error');
         }
     };
 
-    const handleDelete = async (id: number, title: string) => {
-        if (!confirm(`Hapus "${title}"?`)) return;
-        try {
-            await apiService.deleteInfoPublik(id);
-            fetchInfo();
-        } catch (error) {
-            console.error('Failed to delete info:', error);
-            alert('Gagal menghapus informasi.');
-        }
+    const handleDeleteClick = (id: number, title: string) => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Hapus Informasi',
+            message: `Apakah Anda yakin ingin menghapus "${title}"? Tindakan ini tidak dapat dibatalkan.`,
+            isLoading: false,
+            onConfirm: async () => {
+                setConfirmDialog(prev => ({ ...prev, isLoading: true }));
+                try {
+                    await apiService.deleteInfoPublik(id);
+                    showToast('Informasi berhasil dihapus', 'success');
+                    fetchInfo();
+                } catch (error) {
+                    console.error('Failed to delete info:', error);
+                    showToast('Gagal menghapus informasi', 'error');
+                } finally {
+                    setConfirmDialog(prev => ({ ...prev, isOpen: false, isLoading: false }));
+                }
+            }
+        });
     };
 
     const handleCloseForm = () => {
         setShowForm(false);
         resetForm();
     };
+
 
     const filteredInfo = selectedCategory === 'All'
         ? infoList
@@ -134,6 +162,23 @@ export default function InformasiPage() {
 
     return (
         <DashboardLayout>
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    title={toast.title}
+                    onClose={() => setToast(null)}
+                />
+            )}
+            <ConfirmDialog
+                isOpen={confirmDialog.isOpen}
+                title={confirmDialog.title}
+                message={confirmDialog.message}
+                onConfirm={confirmDialog.onConfirm}
+                onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+                isLoading={confirmDialog.isLoading}
+                type="danger"
+            />
             <div className="space-y-6">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -294,7 +339,7 @@ export default function InformasiPage() {
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    handleDelete(info.id, info.title);
+                                                    handleDeleteClick(info.id, info.title);
                                                 }}
                                                 className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors text-sm font-medium"
                                             >
