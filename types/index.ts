@@ -126,3 +126,22 @@ export interface EventRecipient {
     created_at?: string;
 }
 
+export interface EventPanitia {
+    id: number;
+    event_id: number;
+    source_type: 'penduduk_tetap' | 'penduduk_khusus' | 'manual';
+    source_id?: number;
+    nama: string;
+    role: string;
+    no_hp?: string;
+    created_at?: string;
+}
+
+export interface PendudukSearchResult {
+    id: number;
+    nama: string;
+    nik: string;
+    no_hp?: string;
+    source_type: 'penduduk_tetap' | 'penduduk_khusus';
+}
+

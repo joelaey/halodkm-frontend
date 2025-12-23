@@ -409,6 +409,43 @@ class ApiService {
         const { data } = await this.api.delete(`/events/${eventId}/recipients/${recipientId}`);
         return data;
     }
+
+    // Event Panitia Management
+    async getEventPanitia(eventId: number): Promise<ApiResponse<import('@/types').EventPanitia[]>> {
+        const { data } = await this.api.get(`/events/${eventId}/panitia`);
+        return data;
+    }
+
+    async createEventPanitia(eventId: number, panitia: {
+        source_type?: 'penduduk_tetap' | 'penduduk_khusus' | 'manual';
+        source_id?: number;
+        nama: string;
+        role: string;
+        no_hp?: string;
+    }): Promise<ApiResponse<{ id: number }>> {
+        const { data } = await this.api.post(`/events/${eventId}/panitia`, panitia);
+        return data;
+    }
+
+    async updateEventPanitia(eventId: number, panitiaId: number, panitia: {
+        nama: string;
+        role: string;
+        no_hp?: string;
+    }): Promise<ApiResponse<null>> {
+        const { data } = await this.api.put(`/events/${eventId}/panitia/${panitiaId}`, panitia);
+        return data;
+    }
+
+    async deleteEventPanitia(eventId: number, panitiaId: number): Promise<ApiResponse<null>> {
+        const { data } = await this.api.delete(`/events/${eventId}/panitia/${panitiaId}`);
+        return data;
+    }
+
+    // Penduduk Search (for panitia selector)
+    async searchPenduduk(query: string): Promise<ApiResponse<import('@/types').PendudukSearchResult[]>> {
+        const { data } = await this.api.get('/penduduk/search', { params: { q: query } });
+        return data;
+    }
 }
 
 export const apiService = new ApiService();
