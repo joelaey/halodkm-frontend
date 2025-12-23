@@ -8,10 +8,10 @@ import { Button } from '@/components/ui/Button';
 import { Toast, ConfirmDialog, type ToastType } from '@/components/ui/Toast';
 import { apiService } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import type { Event, EventTransaction, EventRecipient } from '@/types';
-import { ArrowLeft, Plus, X, TrendingUp, TrendingDown, CheckCircle, Download, Edit2, Trash2, Calendar, Users, DollarSign, UserPlus, Phone, MapPin, FileText } from 'lucide-react';
+import type { Event, EventTransaction, EventRecipient, EventPanitia, PendudukSearchResult } from '@/types';
+import { ArrowLeft, Plus, X, TrendingUp, TrendingDown, CheckCircle, Download, Edit2, Trash2, Calendar, Users, DollarSign, UserPlus, Phone, MapPin, FileText, Search, Crown, User } from 'lucide-react';
 
-type TabType = 'keuangan' | 'penerima';
+type TabType = 'keuangan' | 'penerima' | 'panitia';
 
 export default function EventDetailPage() {
     const params = useParams();
@@ -48,6 +48,24 @@ export default function EventDetailPage() {
         keterangan: '',
     });
 
+    // Panitia states
+    const [panitia, setPanitia] = useState<EventPanitia[]>([]);
+    const [showPanitiaForm, setShowPanitiaForm] = useState(false);
+    const [editingPanitia, setEditingPanitia] = useState<EventPanitia | null>(null);
+    const [panitiaFormData, setPanitiaFormData] = useState({
+        nama: '',
+        role: 'Anggota',
+        no_hp: '',
+        source_type: 'manual' as 'penduduk_tetap' | 'penduduk_khusus' | 'manual',
+        source_id: undefined as number | undefined,
+    });
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<PendudukSearchResult[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+
+    const ROLE_OPTIONS = ['Ketua', 'Sekretaris', 'Bendahara', 'Anggota'];
+
     // Complete event states
     const [isCompleting, setIsCompleting] = useState(false);
     const [showDocModal, setShowDocModal] = useState(false);
@@ -76,6 +94,7 @@ export default function EventDetailPage() {
     useEffect(() => {
         fetchEventDetail();
         fetchRecipients();
+        fetchPanitia();
     }, [eventId]);
 
     const fetchEventDetail = async () => {
@@ -99,15 +118,59 @@ export default function EventDetailPage() {
         try {
             const response = await apiService.getEventRecipients(eventId);
             if (response.success && response.data) {
-                // Backend returns { success, data: [...], total } directly
-                // Handle both cases for compatibility
                 const recipientData = Array.isArray(response.data) ? response.data : (response.data as any).data || [];
                 setRecipients(recipientData);
             }
         } catch (error) {
             console.error('Error fetching recipients:', error);
-            // Don't show error toast for recipients as it's secondary data
         }
+    };
+
+    const fetchPanitia = async () => {
+        try {
+            const response = await apiService.getEventPanitia(eventId);
+            if (response.success && response.data) {
+                const panitiaData = Array.isArray(response.data) ? response.data : [];
+                setPanitia(panitiaData);
+            }
+        } catch (error) {
+            console.error('Error fetching panitia:', error);
+        }
+    };
+
+    // Search penduduk for panitia selector
+    const handleSearchPenduduk = async (query: string) => {
+        setSearchQuery(query);
+        if (query.length < 2) {
+            setSearchResults([]);
+            setShowSearchDropdown(false);
+            return;
+        }
+        setIsSearching(true);
+        try {
+            const response = await apiService.searchPenduduk(query);
+            if (response.success && response.data) {
+                const results = Array.isArray(response.data) ? response.data : [];
+                setSearchResults(results);
+                setShowSearchDropdown(true);
+            }
+        } catch (error) {
+            console.error('Error searching penduduk:', error);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    const selectPenduduk = (person: PendudukSearchResult) => {
+        setPanitiaFormData({
+            ...panitiaFormData,
+            nama: person.nama,
+            no_hp: person.no_hp || '',
+            source_type: person.source_type,
+            source_id: person.id,
+        });
+        setSearchQuery(person.nama);
+        setShowSearchDropdown(false);
     };
 
     // Transaction handlers
@@ -195,6 +258,58 @@ export default function EventDetailPage() {
             fetchRecipients();
         } catch (error: any) {
             showToast(error?.response?.data?.message || 'Gagal menghapus penerima.', 'error');
+        }
+    };
+
+    // Panitia handlers
+    const resetPanitiaForm = () => {
+        setPanitiaFormData({ nama: '', role: 'Anggota', no_hp: '', source_type: 'manual', source_id: undefined });
+        setSearchQuery('');
+        setEditingPanitia(null);
+    };
+
+    const handleEditPanitia = (p: EventPanitia) => {
+        setEditingPanitia(p);
+        setPanitiaFormData({
+            nama: p.nama,
+            role: p.role,
+            no_hp: p.no_hp || '',
+            source_type: p.source_type,
+            source_id: p.source_id,
+        });
+        setSearchQuery(p.nama);
+        setShowPanitiaForm(true);
+    };
+
+    const handleSubmitPanitia = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!panitiaFormData.nama || !panitiaFormData.role) {
+            showToast('Nama dan role harus diisi', 'warning');
+            return;
+        }
+        try {
+            if (editingPanitia) {
+                await apiService.updateEventPanitia(eventId, editingPanitia.id, panitiaFormData);
+            } else {
+                await apiService.createEventPanitia(eventId, panitiaFormData);
+            }
+            showToast(editingPanitia ? 'Panitia berhasil diperbarui' : 'Panitia berhasil ditambahkan', 'success');
+            resetPanitiaForm();
+            setShowPanitiaForm(false);
+            fetchPanitia();
+        } catch (error: any) {
+            showToast(error?.response?.data?.message || 'Gagal menyimpan panitia.', 'error');
+        }
+    };
+
+    const handleDeletePanitia = async (pId: number) => {
+        if (!confirm('Hapus panitia ini?')) return;
+        try {
+            await apiService.deleteEventPanitia(eventId, pId);
+            showToast('Panitia berhasil dihapus', 'success');
+            fetchPanitia();
+        } catch (error: any) {
+            showToast(error?.response?.data?.message || 'Gagal menghapus panitia.', 'error');
         }
     };
 
@@ -432,26 +547,32 @@ export default function EventDetailPage() {
                     )}
                 </div>
 
-                {/* Tabs for distribusi events */}
-                {event.tipe === 'distribusi' && (
-                    <div className="flex bg-gray-100 p-1 rounded-xl">
-                        <button
-                            onClick={() => setActiveTab('keuangan')}
-                            className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${activeTab === 'keuangan' ? 'bg-white shadow text-emerald-600' : 'text-gray-600 hover:text-gray-800'}`}
-                        >
-                            <DollarSign className="w-4 h-4" /> Keuangan
-                        </button>
+                {/* Tabs */}
+                <div className="flex bg-gray-100 p-1 rounded-xl overflow-x-auto">
+                    <button
+                        onClick={() => setActiveTab('keuangan')}
+                        className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'keuangan' ? 'bg-white shadow text-emerald-600' : 'text-gray-600 hover:text-gray-800'}`}
+                    >
+                        <DollarSign className="w-4 h-4" /> Keuangan
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('panitia')}
+                        className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'panitia' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
+                    >
+                        <Crown className="w-4 h-4" /> Panitia ({panitia.length})
+                    </button>
+                    {event.tipe === 'distribusi' && (
                         <button
                             onClick={() => setActiveTab('penerima')}
-                            className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${activeTab === 'penerima' ? 'bg-white shadow text-purple-600' : 'text-gray-600 hover:text-gray-800'}`}
+                            className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'penerima' ? 'bg-white shadow text-purple-600' : 'text-gray-600 hover:text-gray-800'}`}
                         >
                             <Users className="w-4 h-4" /> Penerima ({recipients.length})
                         </button>
-                    </div>
-                )}
+                    )}
+                </div>
 
                 {/* Keuangan Tab */}
-                {(event.tipe === 'penggalangan_dana' || activeTab === 'keuangan') && (
+                {activeTab === 'keuangan' && (
                     <div className="space-y-4">
                         {isAdmin && event.status === 'aktif' && (
                             <Button onClick={() => { resetTransForm(); setShowTransForm(!showTransForm); }} icon={showTransForm ? X : Plus}>
@@ -523,6 +644,150 @@ export default function EventDetailPage() {
                                                         </div>
                                                     )}
                                                 </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </Card>
+                    </div>
+                )}
+
+                {/* Panitia Tab */}
+                {activeTab === 'panitia' && (
+                    <div className="space-y-4">
+                        {isAdmin && event.status === 'aktif' && (
+                            <Button onClick={() => { resetPanitiaForm(); setShowPanitiaForm(!showPanitiaForm); }} icon={showPanitiaForm ? X : UserPlus}>
+                                {showPanitiaForm ? 'Tutup' : 'Tambah Panitia'}
+                            </Button>
+                        )}
+
+                        {showPanitiaForm && isAdmin && (
+                            <Card className="border-blue-200 ring-4 ring-blue-50">
+                                <h3 className="font-bold text-lg mb-4">{editingPanitia ? 'Edit Panitia' : 'Tambah Panitia'}</h3>
+                                <form onSubmit={handleSubmitPanitia} className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">Cari Penduduk (opsional)</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                                <Search className="w-4 h-4 text-gray-400" />
+                                            </div>
+                                            <input
+                                                type="text"
+                                                className="input !pl-10"
+                                                value={searchQuery}
+                                                onChange={(e) => handleSearchPenduduk(e.target.value)}
+                                                onFocus={() => searchQuery.length >= 2 && setShowSearchDropdown(true)}
+                                                placeholder="Ketik nama untuk mencari..."
+                                            />
+                                            {showSearchDropdown && searchResults.length > 0 && (
+                                                <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                                                    {searchResults.map((person) => (
+                                                        <button
+                                                            key={`${person.source_type}-${person.id}`}
+                                                            type="button"
+                                                            onClick={() => selectPenduduk(person)}
+                                                            className="w-full px-4 py-3 text-left hover:bg-blue-50 flex items-center justify-between border-b last:border-b-0"
+                                                        >
+                                                            <div>
+                                                                <p className="font-medium text-gray-900">{person.nama}</p>
+                                                                <p className="text-xs text-gray-500">{person.no_hp || 'No HP tidak tersedia'}</p>
+                                                            </div>
+                                                            <span className={`text-xs px-2 py-1 rounded-full ${person.source_type === 'penduduk_tetap' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'}`}>
+                                                                {person.source_type === 'penduduk_tetap' ? 'Tetap' : 'Khusus'}
+                                                            </span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-1">Atau isi manual di bawah</p>
+                                    </div>
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 mb-2">Nama *</label>
+                                            <input
+                                                type="text"
+                                                className="input"
+                                                value={panitiaFormData.nama}
+                                                onChange={(e) => setPanitiaFormData({ ...panitiaFormData, nama: e.target.value })}
+                                                placeholder="Nama panitia"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 mb-2">Role/Jabatan *</label>
+                                            <select
+                                                className="input"
+                                                value={panitiaFormData.role}
+                                                onChange={(e) => setPanitiaFormData({ ...panitiaFormData, role: e.target.value })}
+                                                required
+                                            >
+                                                {ROLE_OPTIONS.map(role => (
+                                                    <option key={role} value={role}>{role}</option>
+                                                ))}
+                                                <option value="__custom__">Lainnya (Custom)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    {panitiaFormData.role === '__custom__' && (
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700 mb-2">Role Custom</label>
+                                            <input
+                                                type="text"
+                                                className="input"
+                                                placeholder="Masukkan role custom"
+                                                onChange={(e) => setPanitiaFormData({ ...panitiaFormData, role: e.target.value || 'Anggota' })}
+                                            />
+                                        </div>
+                                    )}
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">No. HP</label>
+                                        <input
+                                            type="text"
+                                            className="input"
+                                            value={panitiaFormData.no_hp}
+                                            onChange={(e) => setPanitiaFormData({ ...panitiaFormData, no_hp: e.target.value })}
+                                            placeholder="08xxxxxxxxxx"
+                                        />
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <Button type="submit" className="flex-1">{editingPanitia ? 'Update' : 'Simpan'}</Button>
+                                        <Button type="button" variant="secondary" onClick={() => { setShowPanitiaForm(false); resetPanitiaForm(); }}>Batal</Button>
+                                    </div>
+                                </form>
+                            </Card>
+                        )}
+
+                        <Card>
+                            <h3 className="font-bold text-lg mb-4">Daftar Panitia</h3>
+                            {panitia.length === 0 ? (
+                                <p className="text-center text-gray-500 py-8">Belum ada panitia</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {panitia.map((p) => (
+                                        <div key={p.id} className="p-4 rounded-xl border border-blue-100 bg-blue-50">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`p-2 rounded-lg ${p.role === 'Ketua' ? 'bg-amber-500' : p.role === 'Sekretaris' ? 'bg-blue-500' : p.role === 'Bendahara' ? 'bg-green-500' : 'bg-gray-500'}`}>
+                                                        {p.role === 'Ketua' ? <Crown className="w-4 h-4 text-white" /> : <User className="w-4 h-4 text-white" />}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-semibold text-gray-900">{p.nama}</p>
+                                                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                                                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${p.role === 'Ketua' ? 'bg-amber-100 text-amber-700' : p.role === 'Sekretaris' ? 'bg-blue-100 text-blue-700' : p.role === 'Bendahara' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                                {p.role}
+                                                            </span>
+                                                            {p.no_hp && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{p.no_hp}</span>}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {isAdmin && event.status === 'aktif' && (
+                                                    <div className="flex items-center gap-1">
+                                                        <button onClick={() => handleEditPanitia(p)} className="p-1.5 hover:bg-white rounded-lg transition-colors"><Edit2 className="w-4 h-4 text-gray-400 hover:text-blue-600" /></button>
+                                                        <button onClick={() => handleDeletePanitia(p.id)} className="p-1.5 hover:bg-white rounded-lg transition-colors"><Trash2 className="w-4 h-4 text-gray-400 hover:text-red-600" /></button>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
