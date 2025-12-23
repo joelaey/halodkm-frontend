@@ -338,9 +338,67 @@ export default function EventDetailPage() {
                         showToast(response.message || 'Event berhasil diselesaikan!', 'success');
 
                         // Show documentation modal
+                        // Generate comprehensive report content
+                        const generateReportContent = () => {
+                            let content = `📋 LAPORAN EVENT: ${event.nama}\n`;
+                            content += `Tanggal: ${new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}\n\n`;
+
+                            // Financial Summary
+                            content += `💰 RINGKASAN KEUANGAN\n`;
+                            content += `Total Pemasukan: ${formatCurrency(summary.total_masuk)}\n`;
+                            content += `Total Pengeluaran: ${formatCurrency(summary.total_keluar)}\n`;
+                            content += `Saldo Akhir: ${formatCurrency(summary.saldo)}`;
+                            content += summary.saldo > 0 ? ' (ditransfer ke Kas Masjid)\n' : '\n';
+                            content += '\n';
+
+                            // Income Details
+                            const incomeItems = transactions.filter(t => t.type === 'masuk');
+                            if (incomeItems.length > 0) {
+                                content += `📥 RINCIAN PEMASUKAN\n`;
+                                incomeItems.forEach((t, i) => {
+                                    content += `${i + 1}. ${t.description} - ${formatCurrency(t.amount)} (${new Date(t.tanggal).toLocaleDateString('id-ID')})\n`;
+                                });
+                                content += '\n';
+                            }
+
+                            // Expense Details
+                            const expenseItems = transactions.filter(t => t.type === 'keluar');
+                            if (expenseItems.length > 0) {
+                                content += `📤 RINCIAN PENGELUARAN\n`;
+                                expenseItems.forEach((t, i) => {
+                                    content += `${i + 1}. ${t.description} - ${formatCurrency(t.amount)} (${new Date(t.tanggal).toLocaleDateString('id-ID')})\n`;
+                                });
+                                content += '\n';
+                            }
+
+                            // Panitia List
+                            if (panitia.length > 0) {
+                                content += `👥 PANITIA\n`;
+                                panitia.forEach((p) => {
+                                    content += `• ${p.nama} (${p.role})${p.no_hp ? ` - ${p.no_hp}` : ''}\n`;
+                                });
+                                content += '\n';
+                            }
+
+                            // Recipients (for distribusi events)
+                            if (event.tipe === 'distribusi' && recipients.length > 0) {
+                                content += `📦 PENERIMA BANTUAN (${recipients.length} orang)\n`;
+                                recipients.forEach((r, i) => {
+                                    let recipientLine = `${i + 1}. ${r.nama}`;
+                                    if (r.jenis_bantuan) recipientLine += ` - ${r.jenis_bantuan}`;
+                                    if (r.jumlah) recipientLine += ` (${r.jumlah})`;
+                                    content += recipientLine + '\n';
+                                });
+                                content += '\n';
+                            }
+
+                            content += '--- Tambahkan notulensi/dokumentasi tambahan di bawah ini ---\n';
+                            return content;
+                        };
+
                         setDocFormData({
                             title: `Laporan Event: ${event.nama}`,
-                            content: `Event "${event.nama}" telah selesai dilaksanakan.\n\nRincian Keuangan:\n- Total Pemasukan: ${formatCurrency(summary.total_masuk)}\n- Total Pengeluaran: ${formatCurrency(summary.total_keluar)}\n- Saldo Akhir: ${formatCurrency(summary.saldo)}${summary.saldo > 0 ? ' (ditransfer ke Kas Masjid)' : ''}${event.tipe === 'distribusi' ? `\n\nTotal Penerima: ${recipients.length} orang` : ''}\n\n--- Tambahkan notulensi/dokumentasi di bawah ini ---\n`,
+                            content: generateReportContent(),
                         });
                         setShowDocModal(true);
                         fetchEventDetail();
